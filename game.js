@@ -1,6 +1,5 @@
 //////////////////////////////////////////////////////
-// BIBLECRAFT - WORKING 3D VOXEL ENGINE
-// Pure WebGL + No Libraries
+// BIBLECRAFT - FIXED 3D ENGINE
 //////////////////////////////////////////////////////
 
 const canvas = document.getElementById("gameCanvas");
@@ -9,6 +8,7 @@ const gl = canvas.getContext("webgl");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+gl.viewport(0, 0, canvas.width, canvas.height);
 gl.enable(gl.DEPTH_TEST);
 
 //////////////////////////////////////////////////////
@@ -47,16 +47,17 @@ gl.linkProgram(program);
 gl.useProgram(program);
 
 //////////////////////////////////////////////////////
-// MATRIX MATH
+// MATRIX HELPERS
 //////////////////////////////////////////////////////
 
 function perspective(fov, aspect, near, far) {
     const f = 1.0 / Math.tan(fov / 2);
+    const nf = 1 / (near - far);
     return new Float32Array([
         f/aspect,0,0,0,
         0,f,0,0,
-        0,0,(far+near)/(near-far),-1,
-        0,0,(2*far*near)/(near-far),0
+        0,0,(far+near)*nf,-1,
+        0,0,(2*far*near)*nf,0
     ]);
 }
 
@@ -75,12 +76,28 @@ function translate(m,x,y,z){
 }
 
 //////////////////////////////////////////////////////
-// CUBE GEOMETRY
+// FULL CUBE (ALL 6 FACES)
 //////////////////////////////////////////////////////
 
 const cubeVertices = new Float32Array([
-    -0.5,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,
-    -0.5,-0.5,-0.5,  0.5,0.5,-0.5, -0.5,0.5,-0.5,
+    // FRONT
+    -0.5,-0.5,0.5,  0.5,-0.5,0.5,  0.5,0.5,0.5,
+    -0.5,-0.5,0.5,  0.5,0.5,0.5, -0.5,0.5,0.5,
+    // BACK
+    -0.5,-0.5,-0.5, -0.5,0.5,-0.5, 0.5,0.5,-0.5,
+    -0.5,-0.5,-0.5, 0.5,0.5,-0.5, 0.5,-0.5,-0.5,
+    // LEFT
+    -0.5,-0.5,-0.5, -0.5,-0.5,0.5, -0.5,0.5,0.5,
+    -0.5,-0.5,-0.5, -0.5,0.5,0.5, -0.5,0.5,-0.5,
+    // RIGHT
+    0.5,-0.5,-0.5, 0.5,0.5,-0.5, 0.5,0.5,0.5,
+    0.5,-0.5,-0.5, 0.5,0.5,0.5, 0.5,-0.5,0.5,
+    // TOP
+    -0.5,0.5,-0.5, -0.5,0.5,0.5, 0.5,0.5,0.5,
+    -0.5,0.5,-0.5, 0.5,0.5,0.5, 0.5,0.5,-0.5,
+    // BOTTOM
+    -0.5,-0.5,-0.5, 0.5,-0.5,-0.5, 0.5,-0.5,0.5,
+    -0.5,-0.5,-0.5, 0.5,-0.5,0.5, -0.5,-0.5,0.5
 ]);
 
 const buffer = gl.createBuffer();
@@ -92,40 +109,35 @@ gl.enableVertexAttribArray(positionLoc);
 gl.vertexAttribPointer(positionLoc,3,gl.FLOAT,false,0,0);
 
 //////////////////////////////////////////////////////
-// WORLD
+// WORLD GENERATION (CENTERED)
 //////////////////////////////////////////////////////
 
-const WORLD_SIZE = 20;
+const WORLD_SIZE = 16;
 let world = {};
 
-function generateWorld() {
-    for(let x=0;x<WORLD_SIZE;x++){
-        for(let z=0;z<WORLD_SIZE;z++){
+function generateWorld(){
+    for(let x=-WORLD_SIZE/2; x<WORLD_SIZE/2; x++){
+        for(let z=-WORLD_SIZE/2; z<WORLD_SIZE/2; z++){
             let height = Math.floor(Math.random()*3)+1;
             for(let y=0;y<height;y++){
-                world[`${x},${y},${z}`]="grass";
+                world[`${x},${y},${z}`] = true;
             }
         }
     }
 }
 
 //////////////////////////////////////////////////////
-// PLAYER
+// CAMERA
 //////////////////////////////////////////////////////
 
-let player = {
-    x:10,y:5,z:10,
-    velY:0,
-    health:100,
-    hunger:100
+let camera = {
+    x:0,
+    y:6,
+    z:15
 };
 
-let keys = {};
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
 //////////////////////////////////////////////////////
-// DAY NIGHT
+// DAY/NIGHT
 //////////////////////////////////////////////////////
 
 let time=0;
@@ -133,46 +145,13 @@ let time=0;
 function updateDayNight(){
     time+=0.01;
     let brightness=Math.sin(time)*0.5+0.5;
-    gl.clearColor(0.2*brightness,0.4*brightness,0.7*brightness,1);
-    document.getElementById("timeOfDay").innerText=
+    gl.clearColor(0.3*brightness,0.5*brightness,0.8*brightness,1);
+    document.getElementById("timeOfDay").innerText =
         brightness<0.3?"Night":"Day";
 }
 
 //////////////////////////////////////////////////////
-// SURVIVAL
-//////////////////////////////////////////////////////
-
-function updateSurvival(){
-    player.hunger-=0.02;
-    if(player.hunger<0) player.health-=0.05;
-
-    document.getElementById("health").innerText=Math.floor(player.health);
-    document.getElementById("hunger").innerText=Math.floor(player.hunger);
-}
-
-//////////////////////////////////////////////////////
-// MOVEMENT + GRAVITY
-//////////////////////////////////////////////////////
-
-function updateMovement(){
-    if(keys["w"]) player.z-=0.1;
-    if(keys["s"]) player.z+=0.1;
-    if(keys["a"]) player.x-=0.1;
-    if(keys["d"]) player.x+=0.1;
-
-    player.velY-=0.01;
-    player.y+=player.velY;
-
-    if(player.y<2){
-        player.y=2;
-        player.velY=0;
-    }
-
-    if(keys[" "]) player.velY=0.2;
-}
-
-//////////////////////////////////////////////////////
-// RENDER WORLD
+// RENDER
 //////////////////////////////////////////////////////
 
 const projectionLoc=gl.getUniformLocation(program,"projection");
@@ -191,13 +170,11 @@ function render(){
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
 
     updateDayNight();
-    updateSurvival();
-    updateMovement();
 
     gl.uniformMatrix4fv(projectionLoc,false,projectionMatrix);
 
     let view=identity();
-    translate(view,-player.x,-player.y,-player.z);
+    translate(view,-camera.x,-camera.y,-camera.z);
     gl.uniformMatrix4fv(viewLoc,false,view);
 
     for(let key in world){
@@ -206,16 +183,13 @@ function render(){
         translate(model,x,y,z);
         gl.uniformMatrix4fv(modelLoc,false,model);
         gl.uniform4f(colorLoc,0.3,0.8,0.3,1);
-        gl.drawArrays(gl.TRIANGLES,0,6);
+        gl.drawArrays(gl.TRIANGLES,0,36);
     }
 
     requestAnimationFrame(render);
 }
 
-//////////////////////////////////////////////////////
-// START
-//////////////////////////////////////////////////////
-
 generateWorld();
 render();
+
 
