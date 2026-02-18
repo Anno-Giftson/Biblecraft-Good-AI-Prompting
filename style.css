@@ -1,0 +1,67 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: black;
+}
+
+canvas {
+    display: block;
+}
+
+#ui {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    color: white;
+    pointer-events: none;
+}
+
+#stats {
+    background: rgba(0,0,0,0.5);
+    padding: 10px;
+}
+
+#inventory {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+}
+
+.inventory-slot {
+    width: 50px;
+    height: 50px;
+    border: 2px solid white;
+    margin: 5px;
+    background: rgba(255,255,255,0.1);
+}
+
+.panel {
+    position: absolute;
+    right: 20px;
+    top: 80px;
+    background: rgba(0,0,0,0.7);
+    padding: 10px;
+}
+
+.hidden {
+    display: none;
+}
+
+#chatBox {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    width: 300px;
+    pointer-events: auto;
+}
+
+#messages {
+    height: 100px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.5);
+    padding: 5px;
+}
